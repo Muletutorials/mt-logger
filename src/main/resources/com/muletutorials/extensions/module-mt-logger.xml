@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module name="MT Logger"
+	prefix="module-mt-logger"
+	doc:description="This module relies in runtime provided components"
+
+	xmlns="http://www.mulesoft.org/schema/mule/module"
+	xmlns:mule="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:tns="http://www.mulesoft.org/schema/mule/module-mt-logger"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+           http://www.mulesoft.org/schema/mule/module http://www.mulesoft.org/schema/mule/module/current/mule-module.xsd
+           http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+           http://www.mulesoft.org/schema/mule/module-mt-logger http://www.mulesoft.org/schema/mule/module-mt-logger/current/mule-module-mt-logger.xsd
+           http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+
+	<property name="host" type="string" displayName="Host"
+		doc:description="Host of the database" />
+	<property name="port" type="string" displayName="Port"
+		doc:description="Port of the database" />
+	<property name="user" type="string" displayName="User"
+		doc:description="Username to connect to the database" />
+	<property name="password" type="string" displayName="Password"
+		password="true" doc:description="Password to connect to the database" />
+	<property name="database" type="string"
+		displayName="Database Name" doc:description="Default Database" />
+	<db:config name="Database_Config" doc:name="Database Config"
+		doc:id="1e21107e-42fd-4f3e-ac18-5ef5fd93d4ae">
+		<db:my-sql-connection host="#[vars.host]"
+			port="#[vars.port]" user="#[vars.user]" password="#[vars.password]"
+			database="#[vars.database]" />
+	</db:config>
+	<operation name="Logger"
+		doc:description="Sends log to the configured Database">
+		<parameters>
+			<parameter name="correlationId" type="string"
+				use="REQUIRED" />
+			<parameter name="stage" type="string" use="REQUIRED" displayName="Stage"/>
+			<parameter name="apiName" type="string" use="OPTIONAL"
+				defaultValue="#[p('api.name')]" displayName="API Name"/>
+			<parameter name="apiVersion" type="string" use="OPTIONAL"
+				defaultValue="#[p('api.version')]" displayName="API Version"/>
+			<parameter name="flowName" type="string" use="OPTIONAL" displayName="Flow Name"/>
+			<parameter name="message" type="string" use="REQUIRED" displayName="Message"/>
+			<parameter name="timeStamp" type="string" use="REQUIRED" displayName="Timestamp"/>
+		</parameters>
+		<body>
+			<mule:logger level="INFO" doc:name="Log"
+				message='#[output application/json ---{
+	"correlationId": vars.correlationId,
+    "stage":vars.stage,
+	"applicationName":vars.apiName,
+    "applicationVersion":vars.apiVersion,
+    "startTime": vars.timeStamp, 
+    ("flowName": vars.flowName) if (vars.flowName != null),
+	"message": vars.message,
+	"elapsedTime": (now() - vars.timestamp) as Number
+}]' />
+			<db:insert doc:name="Insert"
+				doc:id="74a9da8a-72d0-4914-8fb3-130aec40dea5" config-ref="Database_Config">
+				<db:sql><![CDATA[insert into logs (correlationId, stage, apiName, apiVersion, flowName, message, timestamp) values(:correlationId, :stage, :apiName, :apiVersion, :flowName, :message, :timestamp)]]></db:sql>
+				<db:input-parameters><![CDATA[#[{
+	correlationId: vars.correlationId,
+	stage: vars.stage,
+	apiName: vars.apiName,
+	apiVersion: vars.apiVersion,
+	flowName: vars.flowName,
+	message: vars.message,
+	timestamp: vars.timeStamp as String {format : "yyyy-MM-dd HH:mm:ss.SSS"},
+}]]]></db:input-parameters>
+			</db:insert>
+		</body>
+	</operation>
+
+</module>
